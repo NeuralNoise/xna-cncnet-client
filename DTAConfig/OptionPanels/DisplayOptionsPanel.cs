@@ -38,6 +38,7 @@ namespace DTAConfig.OptionPanels
         private List<DirectDrawWrapper> renderers;
 
         private string defaultRenderer;
+        private DirectDrawWrapper selectedRenderer = null;
 
 #if !YR
         private XNALabel lblCompatibilityFixes;
@@ -118,7 +119,7 @@ namespace DTAConfig.OptionPanels
 
             foreach (var renderer in renderers)
             {
-                if (renderer.IsCompatibleWithOS(localOS))
+                if (renderer.IsCompatibleWithOS(localOS) && !renderer.hidden)
                 {
                     ddRenderer.AddItem(new XNADropDownItem()
                     {
@@ -355,6 +356,19 @@ namespace DTAConfig.OptionPanels
 
             if (defaultRenderer == null)
                 throw new Exception("Invalid or missing default renderer for operating system: " + osVersion);
+
+
+            string renderer = UserINISettings.Instance.Renderer;
+
+            selectedRenderer = renderers.Find(r => r.InternalName == renderer);
+
+            if (selectedRenderer == null)
+                selectedRenderer = renderers.Find(r => r.InternalName == defaultRenderer);
+
+            if (selectedRenderer == null)
+                throw new Exception("Missing renderer: " + renderer);
+
+            ClientConfiguration.Instance.useQres = selectedRenderer.useQres;
         }
 
 #if !YR
@@ -570,28 +584,21 @@ namespace DTAConfig.OptionPanels
         /// </summary>
         private void LoadRenderer()
         {
-            OSVersion osVersion = ClientConfiguration.Instance.GetOperatingSystemVersion();
+            int index = ddRenderer.Items.FindIndex(
+                           r => ((DirectDrawWrapper)r.Tag).InternalName == selectedRenderer.InternalName);
 
-            int defaultIndex = ddRenderer.Items.FindIndex(
-                r => ((DirectDrawWrapper)r.Tag).InternalName == defaultRenderer);
-
-            if (defaultIndex == -1)
-                defaultIndex = 0;
-
-            string renderer = UserINISettings.Instance.Renderer;
-
-            if (string.IsNullOrEmpty(renderer))
+            if (index < 0 && selectedRenderer.hidden)
             {
-                // Use default
-                ddRenderer.SelectedIndex = defaultIndex;
-            }
-            else
+                ddRenderer.AddItem(new XNADropDownItem()
             {
-                int index = ddRenderer.Items.FindIndex(
-                    r => ((DirectDrawWrapper)r.Tag).InternalName == renderer);
-
-                ddRenderer.SelectedIndex = index == -1 ? defaultIndex : index;
+                        Text = selectedRenderer.UIName,
+                        TextColor = UISettings.AltColor,
+                        Tag = selectedRenderer
+                    });
+                index = ddRenderer.Items.Count - 1;
             }
+
+            ddRenderer.SelectedIndex = index;
         }
 
         public override void Load()
@@ -705,7 +712,7 @@ namespace DTAConfig.OptionPanels
             int dragDistance = ingameRes[0] / ORIGINAL_RESOLUTION_WIDTH * DRAG_DISTANCE_DEFAULT;
             IniSettings.DragDistance.Value = dragDistance;
 
-            var selectedRenderer = (DirectDrawWrapper)ddRenderer.SelectedItem.Tag;
+            selectedRenderer = (DirectDrawWrapper)ddRenderer.SelectedItem.Tag;
 
             IniSettings.WindowedMode.Value = chkWindowedMode.Checked &&
                 !selectedRenderer.IsDxWnd;
@@ -744,6 +751,8 @@ namespace DTAConfig.OptionPanels
                 renderer.Clean();
 
             selectedRenderer.Apply();
+
+            ClientConfiguration.Instance.useQres = selectedRenderer.useQres;
 
             if (selectedRenderer.IsDxWnd)
             {

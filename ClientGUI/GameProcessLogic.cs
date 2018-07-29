@@ -44,7 +44,7 @@ namespace ClientGUI
 
             GameProcessStarting?.Invoke();
 
-            if (UserINISettings.Instance.WindowedMode)
+            if (UserINISettings.Instance.WindowedMode && ClientConfiguration.Instance.useQres)
             {
                 Logger.Log("Windowed mode is enabled - using QRes.");
                 Process QResProcess = new Process();
